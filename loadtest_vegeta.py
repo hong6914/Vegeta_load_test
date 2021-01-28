@@ -14,26 +14,14 @@ Note:
 
 Environment:
     Mac, Windows, Linux
-
 """
 
-import os
 import json
-import platform
-import subprocess
-import sys
 import signal
 import time
 import getpass
 import argparse
-import traceback
-from enum import Enum
-from error_code import ErrorCode
-from utils import *
 from load_test import *
-
-#from test.testtest import TestTest
-
 
 # Global variables -----
 test_run = None
@@ -356,9 +344,9 @@ def main(argv):
         return ErrorCode.emptyCommandLineParameters
 
     given_args = args.parse_args()
-    test_run = VegetaLoadTest(given_args.target_file, given_args.failure_threshold,
-                              given_args.start_rate, given_args.test_time, given_args.step_rate,
-                              given_args.warm_up_rate, given_args.warm_up_time, given_args.rest_time)
+    test_run = LoadTest(given_args.target_file, given_args.failure_threshold,
+                        given_args.start_rate, given_args.test_time, given_args.step_rate,
+                        given_args.warm_up_rate, given_args.warm_up_time, given_args.rest_time)
 
     return test_run.execute_tests()
 

@@ -1,26 +1,31 @@
 
-import signal
-import platform
 import os
 import sys
 import subprocess
 import traceback
-from enum import Enum
+from enum import IntEnum
 from error_code import ErrorCode
+from typing import *
 
-class PLATFORM(Enum):
+
+class PLATFORM(IntEnum):
     MAC = 1
     LINUX = 2
     WINDOWS = 3
 
 
 class TestUtils:
-    search_cmd = {PLATFORM.MAC: 'which', PLATFORM.LINUX: 'whereis', PLATFORM.WINDOWS: 'where'}
+    search_cmd = {
+        PLATFORM.MAC: 'which',
+        PLATFORM.LINUX: 'whereis',
+        PLATFORM.WINDOWS: 'where'}
 
     # --------------------------------------------------------------------------
-    '''Get the absolute path of this file'''
     @staticmethod
-    def get_absolute_path():
+    def get_absolute_path() -> str:
+        """
+        :return: the absolute path of this file
+        """
         try:
             the_path = __file__
         except AttributeError:
@@ -30,27 +35,40 @@ class TestUtils:
         if the_path.endswith('.pyc') and os.path.exists(the_path[:-1]):
             the_path = the_path[:-1]
 
-        # sort out the symlinks
+        # sort out the symlink
         the_path = os.path.realpath(the_path)
-
         return os.path.dirname(the_path)
 
     # --------------------------------------------------------------------------
     @staticmethod
-    def execute_single_command(self, the_command, show_shell=False):
+    def execute_single_command(the_command: str, show_shell: bool = False) -> Any:
+        """
+        execute one shell command
+        :param the_command: the command string
+        :param show_shell:
+        :return: return code, command stdin and stderr outputs
+        """
         if the_command is None:
             raise Exception(ErrorCode.emptyParameter)
         elif not isinstance(the_command, str):
             raise Exception(ErrorCode.badParameterType)
 
-        pro = subprocess.Popen(the_command.split(' '), shell=show_shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        pro = subprocess.Popen(the_command.split(' '),
+                               shell=show_shell,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
         cmd_output, cmd_err = pro.communicate()
         return pro.returncode, cmd_output, cmd_err
 
     # --------------------------------------------------------------------------
-    # Execute multiple commands in a single line and are hooked with pipes
     @staticmethod
-    def execute_multiple_commands(self, the_commands, show_shell=True):
+    def execute_multiple_commands(the_commands: str, show_shell: bool = True) -> Any:
+        """
+        Execute multiple commands in a single line and are hooked with pipes
+        :param the_commands:
+        :param show_shell:
+        :return:
+        """
         if the_commands is None:
             raise Exception(ErrorCode.emptyParameter)
         elif not isinstance(the_commands, str):
@@ -61,7 +79,6 @@ class TestUtils:
             one_line = proc.decode('utf-8')
             lines = one_line.split('\n')
             return ErrorCode.ok, lines
-        except:
+        except subprocess.CalledProcessError:
             traceback.print_exc()
             return ErrorCode.executeShellCommand, None
-
