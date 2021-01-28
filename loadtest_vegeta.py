@@ -69,7 +69,8 @@ class VegetaLoadTest(LoadTest):
         """
         # check the parameters
         if not os.path.exists(target_file):
-            raise Exception(ErrorCode.fileNotExist, "Cannot find target file {}".format(target_file))
+            raise Exception(ErrorCode.fileNotExist,
+                            "Cannot find target file {}".format(target_file))
         else:
             self.target_file = target_file
 
@@ -80,37 +81,37 @@ class VegetaLoadTest(LoadTest):
                 self.failure_threshold = failure_threshold
 
         if start_rate:
-            if start_rate <= 0 or start_rate > 5000:                            # No more than 5000 requests/second
+            if start_rate <= 0 or start_rate > 5000:        # No more than 5000 requests/second
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.load_start_rate = start_rate
 
         if test_time:
-            if test_time < 0 or test_time > 3600:                               # We do not run for more than one hour
+            if test_time < 0 or test_time > 3600:           # We do not run for more than one hour
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.load_test_time = test_time
 
         if step_rate:
-            if step_rate <= 0 or step_rate > 500:                               # Do NOT increment by 500 requests/s
+            if step_rate <= 0 or step_rate > 500:           # Do NOT increment by 500 requests/s
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.load_step_rate = step_rate
 
         if warm_up_rate:
-            if warm_up_rate <= 0 or warm_up_rate > 5000:                        # No more than 5000 requests/second
+            if warm_up_rate <= 0 or warm_up_rate > 5000:    # No more than 5000 requests/second
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.service_warm_up_rate = warm_up_rate
 
         if warm_up_time:
-            if warm_up_time < 0 or warm_up_time > 600:                          # We do not run for more than 10 minutes
+            if warm_up_time < 0 or warm_up_time > 600:      # We do not run for more than 10 minutes
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.service_warm_up_time = warm_up_time
 
         if rest_time:
-            if rest_time < 0 or rest_time > 60:                                 # We do not rest for more than 1 minute
+            if rest_time < 0 or rest_time > 60:             # We do not rest for more than 1 minute
                 raise Exception(ErrorCode.valueOutOfRange)
             else:
                 self.load_rest_time = rest_time
@@ -146,8 +147,8 @@ class VegetaLoadTest(LoadTest):
             print('\n\nSkip on warming up target service\'s JVM\n\n')
             return 0
 
-        print('\n\nWarming up target service for {} requests/s and run for {} seconds ...\n'.format(
-            self.service_warm_up_rate, self.service_warm_up_time))
+        print('\n\nWarming up target service for {} requests/s and run for {} seconds ...\n'
+              .format(self.service_warm_up_rate, self.service_warm_up_time))
         cmd = "vegeta attack -rate={} -duration={}s -targets={} | vegeta report".format(
             self.service_warm_up_rate, self.service_warm_up_time, self.target_file)
         print('\t{}'.format(cmd))
@@ -167,20 +168,22 @@ class VegetaLoadTest(LoadTest):
         fail_count = 0
 
         while True:
-            cmd = "vegeta attack -rate={} -duration={}s -targets={} | vegeta report -type json".format(
-                attack_rate, attack_time, self.target_file)
+            cmd = "vegeta attack -rate={} -duration={}s -targets={} | vegeta report -type json"\
+                .format(attack_rate, attack_time, self.target_file)
             print('\nExecuting:  {}'.format(cmd))
 
             ret, result = TestUtils.execute_multiple_commands(cmd)
 
-            ''' Vegeta uses single-quotes in json object. It will fail typical json parsers to validate the objects.
-                Convert to use double-quotes instead. '''
+            ''' Vegeta uses single-quotes in json object. It will fail typical json parsers to 
+            validate the objects. Convert to use double-quotes instead. '''
             entry = json.loads(result[0].replace("\'", "\""))
 
             self.result_set.append(entry)
             print('\tResponse: {}'.format(entry))
 
-            ret, new_rate, fail_count = self.result_analysis_adaptive_adjustments(entry, attack_rate, fail_count)
+            ret, new_rate, fail_count = self.result_analysis_adaptive_adjustments(entry,
+                                                                                  attack_rate,
+                                                                                  fail_count)
             if ret != 0 or fail_count >= 5:
                 break
 
@@ -196,7 +199,8 @@ class VegetaLoadTest(LoadTest):
     def result_analysis_adaptive_adjustments(self, entry, current_rate, fail_count):
         success_rate = entry['success'] * 100
         current_failure_rate = 100 - success_rate
-        print('\tExpected Failure Rate: {}%\t\tActual: {}%\n'.format(self.failure_threshold, current_failure_rate))
+        print('\tExpected Failure Rate: {}%\t\tActual: {}%\n'.format(self.failure_threshold,
+                                                                     current_failure_rate))
 
         continue_test = (current_failure_rate / self.failure_threshold - 1) < 0.2
 
@@ -207,7 +211,8 @@ class VegetaLoadTest(LoadTest):
         else:
             fail_count += 1
             if fail_count >= 5:
-                print('\tFailure rate is too high, and we tried for {} times. Stop the load test.'.format(fail_count))
+                print('\tFailure rate is too high, and we tried for {} times. Stop the load test.'
+                      .format(fail_count))
                 return ErrorCode.requestRateTooHigh, current_rate, fail_count
 
             if current_failure_rate < self.failure_threshold:
@@ -216,8 +221,9 @@ class VegetaLoadTest(LoadTest):
                 ratio = (1 - self.failure_threshold / current_failure_rate)
                 new_rate = current_rate - int(self.load_step_rate * ratio)
 
-            if abs(new_rate - current_rate) < 5:                                    # No need to continue
-                print('\tThe expected new rate {} is too close to existing rate {} - stop the load test.'.format(
+            if abs(new_rate - current_rate) < 5:            # No need to continue
+                print('\tThe expected new rate {} is too close to existing rate {} - stop the load test.'
+                    .format(
                     new_rate, current_rate))
                 return ErrorCode.requestRateTooHigh, None, fail_count
 
@@ -255,16 +261,17 @@ class VegetaLoadTest(LoadTest):
 \tService Warm-up Rate    : {}/second\n\
 \t        Warm-up Time    : {} seconds\n\n\
 \tTotal Runs: {}\n\
-'.format(self.failure_threshold, self.target_file, self.load_start_rate, self.load_step_rate, self.load_test_time,
-         self.load_rest_time, self.service_warm_up_rate, self.service_warm_up_time, len(self.result_set))
+'.format(self.failure_threshold, self.target_file, self.load_start_rate,
+         self.load_step_rate, self.load_test_time, self.load_rest_time,
+         self.service_warm_up_rate, self.service_warm_up_time, len(self.result_set))
         print(summary_str)
         with open(result_setting_file, 'w')as f:
             f.write(summary_str)
 
         # The sorted results are saved to one CSV file for later processing
         with open(result_csv_file, 'w')as f:
-            f.write('ID,Total_Requests,Request_Rate,Success%,Failure%,Time(s),Latency_Mean(s),Latency_50th(s),\
-Latency_95th(s),Latency_99th(s),Latency_Max(s)\n')
+            f.write('ID,Total_Requests,Request_Rate,Success%,Failure%,Time(s),Latency_Mean(s),'
+                    'Latency_50th(s),Latency_95th(s),Latency_99th(s),Latency_Max(s)\n')
 
             print('\n\
 Requests                                         Latencies\n\
@@ -298,7 +305,8 @@ ID  Total   Rate   Success%  Failure%  Time      Mean      50th      95th      9
                     format_str += '{4:<2.5f}  '
 
                 csv_format_str = ','.join(format_str.split())
-                format_str += '{5:>5.3f}{6:2}  {7:>6.3f}{8:2}  {9:>6.3f}{10:2}  {11:>6.3f}{12:2}  {13:>6.3f}{14:2}  {15:>6.3f}{16:2}'
+                format_str += '{5:>5.3f}{6:2}  {7:>6.3f}{8:2}  {9:>6.3f}{10:2}  {11:>6.3f}{12:2}' \
+                              '  {13:>6.3f}{14:2}  {15:>6.3f}{16:2}'
                 print(format_str.format(*test_result))
 
                 csv_result = (i, one_test['requests'], int(one_test['rate']), success_rate,
