@@ -54,8 +54,19 @@ class VegetaLoadTest(LoadTest):
     result_set = []
 
     # --------------------------------------------------------------------------
-    def __init__(self, target_file, failure_threshold, start_rate, test_time, step_rate,
-                 warm_up_rate, warm_up_time, rest_time):
+    def __init__(self, target_file: str, failure_threshold: float, start_rate: int,
+                 test_time: int, step_rate: int, warm_up_rate: int, warm_up_time: int,
+                 rest_time: int):
+        """
+        :param target_file: the vegeta file that hosts all the HTTP requests
+        :param failure_threshold: stop the test if the failure rate > this threshold
+        :param start_rate: start HTTP request rate for vegeta runs
+        :param test_time: test run time in seconds. Cannot be more than 1 hour
+        :param step_rate: the rate to increase or decrease the requests
+        :param warm_up_rate: the initial warm-up request rate for service side JVMs.
+        :param warm_up_time: <= 10 minutes
+        :param rest_time: the rest time between two chunks of vegeta tests
+        """
         # check the parameters
         if not os.path.exists(target_file):
             raise Exception(ErrorCode.fileNotExist, "Cannot find target file {}".format(target_file))
@@ -122,7 +133,7 @@ class VegetaLoadTest(LoadTest):
 
     # --------------------------------------------------------------------------
     def check_vegeta_settings(self):
-        return super.check_load_tool_settings('vegeta', 2)
+        return LoadTest.check_load_tool_settings('vegeta', 2)
 
     # --------------------------------------------------------------------------
     '''
@@ -141,7 +152,7 @@ class VegetaLoadTest(LoadTest):
             self.service_warm_up_rate, self.service_warm_up_time, self.target_file)
         print('\t{}'.format(cmd))
 
-        ret, result = self.execute_multiple_commands(cmd)
+        ret, result = TestUtils.execute_multiple_commands(cmd)
         if self.load_rest_time > 0:
             print('\tRest for {} seconds ...'.format(self.load_rest_time))
             time.sleep(self.load_rest_time)
@@ -160,7 +171,7 @@ class VegetaLoadTest(LoadTest):
                 attack_rate, attack_time, self.target_file)
             print('\nExecuting:  {}'.format(cmd))
 
-            ret, result = self.execute_multiple_commands(cmd)
+            ret, result = TestUtils.execute_multiple_commands(cmd)
 
             ''' Vegeta uses single-quotes in json object. It will fail typical json parsers to validate the objects.
                 Convert to use double-quotes instead. '''
@@ -270,10 +281,11 @@ ID  Total   Rate   Success%  Failure%  Time      Mean      50th      95th      9
                 time_99th, time_unit_99th = self.evalute_time(one_test['latencies']['99th'])
                 time_max,  time_unit_max  = self.evalute_time(one_test['latencies']['max'])
 
-                test_result = (i, one_test['requests'], int(one_test['rate']), success_rate, failure_rate,
-                        total_time, total_time_unit, time_mean, time_unit_mean,
-                        time_50th, time_unit_50th, time_95th, time_unit_95th,
-                        time_99th, time_unit_99th, time_max, time_unit_max)
+                test_result = (i, one_test['requests'], int(one_test['rate']),
+                               success_rate, failure_rate,
+                               total_time, total_time_unit, time_mean, time_unit_mean,
+                               time_50th, time_unit_50th, time_95th, time_unit_95th,
+                               time_99th, time_unit_99th, time_max, time_unit_max)
 
                 format_str = '{0:2d}   {1:5d}  {2:5d}  '
                 format_str += '{3:3.4f}  ' if int(success_rate) == 100 else '{3:2.5f}  '
@@ -286,18 +298,15 @@ ID  Total   Rate   Success%  Failure%  Time      Mean      50th      95th      9
                     format_str += '{4:<2.5f}  '
 
                 csv_format_str = ','.join(format_str.split())
-
                 format_str += '{5:>5.3f}{6:2}  {7:>6.3f}{8:2}  {9:>6.3f}{10:2}  {11:>6.3f}{12:2}  {13:>6.3f}{14:2}  {15:>6.3f}{16:2}'
-
                 print(format_str.format(*test_result))
 
-                csv_result = (i, one_test['requests'], int(one_test['rate']), success_rate, failure_rate,
-                        total_time, time_mean, time_50th, time_95th, time_99th, time_max)
+                csv_result = (i, one_test['requests'], int(one_test['rate']), success_rate,
+                              failure_rate, total_time, time_mean, time_50th, time_95th,
+                              time_99th, time_max)
 
                 csv_format_str += '{5:5.3f},{6:6.3f},{7:6.3f},{8:6.3f},{9:6.3f},{10:6.3f}\n'
-                # print(csv_format_str)
                 f.write(csv_format_str.format(*csv_result))
-
                 i += 1
 
         return 0
@@ -322,31 +331,45 @@ def main(argv):
     signal.signal(signal.SIGINT, signal_handler)
 
     args = argparse.ArgumentParser(description='Load Testing Tool --- Vegeta Based')
-    args.add_argument('--target_file',  "-f", type=str, action="store", dest="target_file", default=None,
+    args.add_argument('--target_file',  "-f", type=str, action="store",
+                      dest="target_file", default=None,
                       help="The file that stores all the HTTP requests to attack the web service.")
-    args.add_argument('--failure_threshold', "-t", type=float, action="store", dest="failure_threshold", default=5.0,
-                      help="The EXPECTED failure threshold. We'll adjust the load rate to meet it. Default = 5%%")
-    args.add_argument('--start_rate',   "-s", type=int, action="store", dest="start_rate", default=50, nargs='?',
-                      help="Number of requests/second to start load test. Optional. Default is 50.")
-    args.add_argument('--test_time',    "-e", type=int, action="store", dest="test_time", default=10, nargs='?',
-                      help="Number of seconds to run one load test. Optional. Default is 10 seconds.")
-    args.add_argument('--step_rate',    "-p", type=int, action="store", dest="step_rate", default=50, nargs='?',
-                      help="Number of requests/second to add to each load test. Optional. Default is 50.")
-    args.add_argument('--warm_up_rate', "-u", type=int, action="store", dest="warm_up_rate", default=20, nargs='?',
-                      help="Number of requests/second to warm up target service. Optional. Default is 20. Set to 0 to skip it.")
-    args.add_argument('--warm_up_time', "-w", type=int, action="store", dest="warm_up_time", default=10, nargs='?',
+    args.add_argument('--failure_threshold', "-t", type=float, action="store",
+                      dest="failure_threshold", default=5.0,
+                      help="The EXPECTED failure threshold. We'll adjust the load rate to meet it. "
+                           "Default = 5%%")
+    args.add_argument('--start_rate',   "-s", type=int, action="store",
+                      dest="start_rate", default=50, nargs='?',
+                      help="Number of requests/second to start load test. Optional. "
+                           "Default is 50.")
+    args.add_argument('--test_time',    "-e", type=int, action="store",
+                      dest="test_time", default=10, nargs='?',
+                      help="Number of seconds to run one load test. Optional. "
+                           "Default is 10 seconds.")
+    args.add_argument('--step_rate',    "-p", type=int, action="store",
+                      dest="step_rate", default=50, nargs='?',
+                      help="Number of requests/second to add to each load test. "
+                           "Optional. Default is 50.")
+    args.add_argument('--warm_up_rate', "-u", type=int, action="store",
+                      dest="warm_up_rate", default=20, nargs='?',
+                      help="Number of requests/second to warm up target service. Optional. "
+                           "Default is 20. Set to 0 to skip it.")
+    args.add_argument('--warm_up_time', "-w", type=int, action="store",
+                      dest="warm_up_time", default=10, nargs='?',
                       help="Number of seconds to warm up target service. Optional. Default is 10 seconds.")
-    args.add_argument('--rest_time',    "-r", type=int, action="store", dest="rest_time", default=5, nargs='?',
-                      help="Number of seconds to rest between two load runs. Optional. Default is 5 seconds. Set to 0 to skip it.")
+    args.add_argument('--rest_time',    "-r", type=int, action="store",
+                      dest="rest_time", default=5, nargs='?',
+                      help="Number of seconds to rest between two load runs. Optional. "
+                           "Default is 5 seconds. Set to 0 to skip it.")
 
     if len(argv) == 1:
         args.print_help()
         return ErrorCode.emptyCommandLineParameters
 
     given_args = args.parse_args()
-    test_run = LoadTest(given_args.target_file, given_args.failure_threshold,
-                        given_args.start_rate, given_args.test_time, given_args.step_rate,
-                        given_args.warm_up_rate, given_args.warm_up_time, given_args.rest_time)
+    test_run = VegetaLoadTest(given_args.target_file, given_args.failure_threshold,
+                              given_args.start_rate, given_args.test_time, given_args.step_rate,
+                              given_args.warm_up_rate, given_args.warm_up_time, given_args.rest_time)
 
     return test_run.execute_tests()
 
